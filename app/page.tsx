@@ -1,173 +1,198 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 
-interface WordMetric {
-  word: string;
-  error_type: string;
-  accuracy_score: number;
-}
+export default function PronunciationScorer() {
+  const [referenceText, setReferenceText] = useState('');
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  
+  const [isLoading, setIsLoading] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const [error, setError] = useState('');
 
-interface AssessmentResponse {
-  overall_score: number;
-  transcript_detected: string;
-  words: WordMetric[];
-}
-
-export default function Home() {
-  const [file, setFile] = useState<File | null>(null);
-  const [referenceText, setReferenceText] = useState<string>("");
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<AssessmentResponse | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    setError(null);
-    setResult(null);
-    const selectedFile = e.target.files?.[0];
-    if (!selectedFile) return;
-
-    try {
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const arrayBuffer = await selectedFile.arrayBuffer();
-      const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-      const duration = audioBuffer.duration;
-
-      if (duration < 30 || duration > 45) {
-        setError(`Audio must be between 30 and 45 seconds. Your file is ${duration.toFixed(1)}s.`);
-        setFile(null);
-        if (fileInputRef.current) fileInputRef.current.value = "";
-        return;
-      }
-
-      setFile(selectedFile);
-    } catch (err) {
-      setError("Failed to read audio file. Please ensure it is a valid MP3 or WAV.");
-      setFile(null);
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setAudioFile(e.target.files[0]);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file || !referenceText.trim()) return;
+    setError('');
+    setResult(null);
 
-    setLoading(true);
-    setError(null);
+    if (!audioFile || !referenceText) {
+      setError('Please provide both text and an audio file.');
+      return;
+    }
+
+    setIsLoading(true);
 
     const formData = new FormData();
-    formData.append("file", file);
-    formData.append("reference_text", referenceText.trim());
+    formData.append('reference_text', referenceText);
+    formData.append('file', audioFile);
 
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8000";
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8000';
+      
       const response = await fetch(`${backendUrl}/api/score`, {
-        method: "POST",
+        method: 'POST',
         body: formData,
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.detail || "Server failed to process analysis.");
+        throw new Error(data.detail || 'API request failed');
       }
 
-      const data: AssessmentResponse = await response.json();
       setResult(data);
     } catch (err: any) {
-      setError(err.message || "A network communication error occurred.");
+      setError(err.message || 'Failed to connect to the scoring server.');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return 'text-emerald-400';
+    if (score >= 50) return 'text-amber-400';
+    return 'text-rose-400';
+  };
+
   return (
-    <main style={{ maxWidth: '800px', margin: '40px auto', padding: '20px', fontFamily: 'system-ui, sans-serif' }}>
-      <h1>Free Pronunciation Evaluator</h1>
-      
-      {/* Strict DPDP Compliance Notice */}
-      <div style={{ background: '#f8f9fa', borderLeft: '4px solid #198754', padding: '15px', marginBottom: '30px' }}>
-        <strong>Privacy Notice (DPDP Act 2023):</strong> By uploading, you consent to your voice data being processed dynamically to generate an evaluation. 
-        Your audio is held temporarily in RAM and is <strong>permanently destroyed immediately after response compilation</strong>. No persistent databases or file logs are used.
-      </div>
+    <div className="min-h-screen bg-[#09090b] text-zinc-100 p-6 sm:p-12 font-sans antialiased">
+      <div className="max-w-2xl mx-auto space-y-8">
+        
+        <h1 className="text-2xl font-bold tracking-tight text-white">
+          Free Pronunciation Evaluator
+        </h1>
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        <div>
-          <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px' }}>Reference Prompt Text</label>
-          <textarea
-            rows={4}
-            required
-            value={referenceText}
-            onChange={(e) => setReferenceText(e.target.value)}
-            style={{ width: '100%', padding: '10px', borderRadius: '5px', border: '1px solid #ccc' }}
-            placeholder="Type out the exact script text statement spoken inside the file..."
-          />
-        </div>
-
-        <div>
-          <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px' }}>Upload Audio File (Strictly 30 to 45 seconds)</label>
-          <input 
-            type="file" 
-            accept="audio/mp3, audio/wav, audio/mpeg" 
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            required 
-            style={{ padding: '10px', border: '1px solid #ccc', borderRadius: '5px', width: '100%' }}
-          />
-        </div>
-
-        <button 
-          type="submit" 
-          disabled={loading || !file}
-          style={{ padding: '12px', background: loading ? '#6c757d' : '#198754', color: 'white', border: 'none', borderRadius: '5px', fontWeight: 'bold', cursor: loading ? 'not-allowed' : 'pointer' }}
-        >
-          {loading ? "Transcribing & Evaluating... (May take a few moments)" : "Analyze Speech"}
-        </button>
-      </form>
-
-      {error && <div style={{ marginTop: '20px', padding: '15px', background: '#f8d7da', color: '#842029', borderRadius: '5px' }}>{error}</div>}
-
-      {result && (
-        <div style={{ marginTop: '40px', borderTop: '2px solid #eee', paddingTop: '30px' }}>
-          <h2>Pronunciation Score: {result.overall_score}/100</h2>
-
-          <h3 style={{ marginTop: '20px' }}>Error Feedback Alignment Map:</h3>
-          <p style={{ color: '#666', marginBottom: '20px', fontSize: '14px' }}>
-            <span style={{ color: '#dc3545', fontWeight: 'bold', backgroundColor: '#f8d7da', padding: '2px 6px', borderRadius: '4px' }}>Red Highlight</span> = Mispronounced / Unclear | 
-            <span style={{ textDecoration: 'line-through', color: '#6c757d', margin: '0 10px' }}>Strikethrough</span> = Omitted Word | 
-            <span style={{ textDecoration: 'underline', color: '#fd7e14', marginLeft: '10px' }}>Underline</span> = Insertion (Extra Spoken Word)
+        <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-5">
+          <p className="text-sm text-zinc-400 leading-relaxed">
+            <strong className="text-zinc-200 font-semibold">Privacy Notice (DPDP Act 2023):</strong> By uploading, you consent to your voice data being processed dynamically to generate an evaluation. Your audio is held temporarily in RAM and is <span className="text-emerald-400/90 font-medium">permanently destroyed immediately after response compilation</span>. No persistent databases or file logs are used.
           </p>
-
-          <div style={{ fontSize: '18px', lineHeight: '2', padding: '20px', border: '1px solid #dee2e6', borderRadius: '8px', backgroundColor: '#fff' }}>
-            {result.words.map((w, index) => {
-              let style: React.CSSProperties = { marginRight: '8px', padding: '2px 4px', borderRadius: '4px', display: 'inline-block' };
-              
-              if (w.error_type === "Mispronunciation") {
-                style.color = '#dc3545';
-                style.backgroundColor = '#f8d7da';
-              } else if (w.error_type === "Omission") {
-                style.textDecoration = 'line-through';
-                style.color = '#6c757d';
-              } else if (w.error_type === "Insertion") {
-                style.textDecoration = 'underline';
-                style.color = '#fd7e14';
-              } else {
-                style.color = '#198754';
-              }
-
-              return (
-                <span key={index} style={style}>
-                  {w.word}
-                </span>
-              );
-            })}
-          </div>
-
-          <div style={{ marginTop: '25px', padding: '15px', background: '#f1f3f5', borderRadius: '6px' }}>
-            <strong>Raw Transcript Heard By AI Engine:</strong>
-            <p style={{ fontStyle: 'italic', marginTop: '5px', color: '#495057' }}>"{result.transcript_detected}"</p>
-          </div>
         </div>
-      )}
-    </main>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-2">
+            <label className="block text-sm font-semibold text-zinc-300">
+              Reference Prompt Text
+            </label>
+            <textarea
+              rows={4}
+              required
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-4 text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all resize-none"
+              placeholder="Type out the exact script text statement spoken inside the file..."
+              value={referenceText}
+              onChange={(e) => setReferenceText(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-sm font-semibold text-zinc-300">
+              Upload Audio File <span className="text-zinc-500 font-normal">(Strictly 30 to 45 seconds)</span>
+            </label>
+            <div className="relative">
+              <input
+                type="file"
+                accept="audio/*"
+                required
+                onChange={handleFileChange}
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 text-sm text-zinc-400 
+                  file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold 
+                  file:bg-zinc-800 file:text-zinc-200 hover:file:bg-zinc-700 hover:border-zinc-700 transition-all cursor-pointer"
+              />
+            </div>
+          </div>
+
+          {error && (
+            <div className="bg-rose-900/20 border border-rose-900/50 rounded-lg p-4">
+              <p className="text-sm font-medium text-rose-400">{error}</p>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full flex justify-center items-center bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 px-4 rounded-lg shadow-lg shadow-emerald-900/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          >
+            {isLoading ? (
+              <span className="flex items-center gap-2">
+                <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Analyzing Engine Running...
+              </span>
+            ) : (
+              'Analyze Speech'
+            )}
+          </button>
+        </form>
+
+        {/* RESULTS DASHBOARD */}
+        {result && (
+          <div className="mt-12 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <h2 className="text-xl font-bold border-b border-zinc-800 pb-2">Analysis Results</h2>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 text-center flex flex-col justify-center">
+                <span className="text-xs text-zinc-500 uppercase tracking-wider font-bold mb-1">Total Score</span>
+                <span className={`text-5xl font-black ${getScoreColor(result.pronunciation_score)}`}>
+                  {result.pronunciation_score}%
+                </span>
+              </div>
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 text-center flex flex-col justify-center">
+                <span className="text-xs text-zinc-500 uppercase tracking-wider font-bold mb-1">Track Length</span>
+                <span className="text-3xl font-bold text-zinc-200">{result?.duration_seconds || 0}s</span>
+              </div>
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 text-center flex flex-col justify-center">
+                <span className="text-xs text-zinc-500 uppercase tracking-wider font-bold mb-1">Phonetic Errors</span>
+                <span className="text-3xl font-bold text-zinc-200">{result?.metrics?.edit_distance_errors || 0}</span>
+              </div>
+            </div>
+
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-6">
+              
+              <div>
+                <h3 className="text-sm font-semibold text-zinc-400 mb-2 uppercase tracking-wide">Whisper AI Transcript</h3>
+                <p className="text-zinc-300 bg-zinc-950 p-4 rounded-lg italic border border-zinc-800/50">
+                  "{result?.alignment?.whisper_transcription || "No transcription available."}"
+                </p>
+              </div>
+
+              <div className="space-y-4 pt-4 border-t border-zinc-800/50">
+                <div>
+                  <h3 className="text-sm font-semibold text-zinc-400 mb-2 uppercase tracking-wide">Expected Sounds (Target)</h3>
+                  <div className="flex flex-wrap gap-1.5">
+                    {/* SAFE MAP: We check if expected_phonemes exists, otherwise map empty array */}
+                    {(result?.alignment?.expected_phonemes || []).map((phone: string, i: number) => (
+                      <span key={i} className="bg-zinc-800 text-emerald-400 border border-emerald-900/30 px-2 py-1 rounded text-xs font-mono font-bold">
+                        {phone}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-semibold text-zinc-400 mb-2 uppercase tracking-wide">Actually Spoken (Detected)</h3>
+                  <div className="flex flex-wrap gap-1.5">
+                    {/* SAFE MAP: We check if spoken_phonemes exists, otherwise map empty array */}
+                    {(result?.alignment?.spoken_phonemes || []).map((phone: string, i: number) => (
+                      <span key={i} className="bg-zinc-800 text-zinc-400 border border-zinc-700 px-2 py-1 rounded text-xs font-mono">
+                        {phone}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        )}
+
+      </div>
+    </div>
   );
 }
