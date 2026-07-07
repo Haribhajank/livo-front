@@ -314,6 +314,140 @@
 // }
 
 
+// 'use client';
+
+// import React, { useState } from 'react';
+
+// export default function PronunciationScorer() {
+//   const [referenceText, setReferenceText] = useState('');
+//   const [audioFile, setAudioFile] = useState<File | null>(null);
+  
+//   const [isLoading, setIsLoading] = useState(false);
+//   const [result, setResult] = useState<any>(null);
+//   const [error, setError] = useState('');
+
+//   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+//     if (e.target.files && e.target.files.length > 0) {
+//       setAudioFile(e.target.files[0]);
+//     }
+//   };
+
+//   const handleSubmit = async (e: React.FormEvent) => {
+//     e.preventDefault();
+//     setError('');
+//     setResult(null);
+
+//     if (!audioFile || !referenceText) {
+//       setError('Please provide both text and an audio file.');
+//       return;
+//     }
+
+//     setIsLoading(true);
+
+//     const formData = new FormData();
+//     formData.append('reference_text', referenceText);
+//     formData.append('file', audioFile);
+
+//     try {
+//       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8000';
+//       const response = await fetch(`${backendUrl}/api/score`, {
+//         method: 'POST',
+//         body: formData,
+//       });
+
+//       const data = await response.json();
+//       if (!response.ok) throw new Error(data.detail || 'API request failed');
+
+//       setResult(data);
+//     } catch (err: any) {
+//       setError(err.message || 'Failed to connect to the scoring server.');
+//     } finally {
+//       setIsLoading(false);
+//     }
+//   };
+
+//   const getScoreColor = (score: number) => {
+//     if (score >= 80) return 'text-emerald-400';
+//     if (score >= 50) return 'text-amber-400';
+//     return 'text-rose-400';
+//   };
+
+//   return (
+//     <div className="min-h-screen bg-[#09090b] text-zinc-100 p-6 sm:p-12 font-sans antialiased">
+//       <div className="max-w-2xl mx-auto space-y-8">
+//         <h1 className="text-2xl font-bold tracking-tight text-white">LIVO Pronunciation Evaluator</h1>
+
+//         <form onSubmit={handleSubmit} className="space-y-6">
+//           <textarea
+//             rows={4}
+//             required
+//             className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-4 text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+//             placeholder="Type your script here..."
+//             value={referenceText}
+//             onChange={(e) => setReferenceText(e.target.value)}
+//           />
+//           <input type="file" accept="audio/*" required onChange={handleFileChange} className="w-full text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:bg-zinc-800 file:text-zinc-200 cursor-pointer" />
+//           <button type="submit" disabled={isLoading} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 rounded-lg transition-all">
+//             {isLoading ? 'Analyzing...' : 'Analyze Speech'}
+//           </button>
+//         </form>
+
+//         {result && (
+//           <div className="mt-12 space-y-6 animate-in fade-in duration-500">
+//             <h2 className="text-xl font-bold border-b border-zinc-800 pb-2">Analysis Results</h2>
+            
+//             {/* 1. Summary Metrics (Old Metrics) */}
+//             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+//               <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 text-center">
+//                 <span className="text-xs text-zinc-500 uppercase font-bold">Score</span>
+//                 <span className={`block text-4xl font-black ${getScoreColor(result.pronunciation_score)}`}>{result.pronunciation_score}%</span>
+//               </div>
+//               <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 text-center">
+//                 <span className="text-xs text-zinc-500 uppercase font-bold">Length</span>
+//                 <span className="block text-3xl font-bold text-zinc-200">{result.duration_seconds}s</span>
+//               </div>
+//               <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 text-center">
+//                 <span className="text-xs text-zinc-500 uppercase font-bold">Errors</span>
+//                 <span className="block text-3xl font-bold text-zinc-200">{result.metrics.edit_distance_errors}</span>
+//               </div>
+//             </div>
+
+//             {/* 2. Granular Phonetic Matrix (New Logic) */}
+//             <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+//               <h4 className="text-sm font-bold text-zinc-400 uppercase mb-4">Phoneme Alignment Matrix</h4>
+//               <div className="flex flex-wrap gap-2">
+//                 {(result?.alignment_details || []).map((item: any, i: number) => {
+//                   const styles: any = {
+//                     correct: "bg-zinc-800 text-emerald-400 border-emerald-900/30",
+//                     mispronunciation: "bg-rose-900/30 text-rose-400 border-rose-800",
+//                     skipped: "bg-amber-900/30 text-amber-400 border-amber-800 line-through",
+//                     extra: "bg-blue-900/30 text-blue-400 border-blue-800"
+//                   };
+//                   return (
+//                     <div key={i} className={`flex flex-col items-center px-2 py-1 rounded border ${styles[item.type] || "bg-zinc-800"}`}>
+//                       <span className="text-xs font-mono font-bold">
+//                         {item.type === 'mispronunciation' ? item.actual : (item.phone || item.expected)}
+//                       </span>
+//                       {item.type === 'mispronunciation' && (
+//                         <span className="text-[9px] text-zinc-500 uppercase italic">exp: {item.expected}</span>
+//                       )}
+//                     </div>
+//                   );
+//                 })}
+//               </div>
+//             </div>
+
+//             <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+//               <h3 className="text-sm font-semibold text-zinc-400 mb-2 uppercase tracking-wide">Transcript</h3>
+//               <p className="text-zinc-300 italic">"{result?.meta?.whisper_transcription}"</p>
+//             </div>
+//           </div>
+//         )}
+//       </div>
+//     </div>
+//   );
+// }
+
 'use client';
 
 import React, { useState } from 'react';
@@ -396,7 +530,7 @@ export default function PronunciationScorer() {
           <div className="mt-12 space-y-6 animate-in fade-in duration-500">
             <h2 className="text-xl font-bold border-b border-zinc-800 pb-2">Analysis Results</h2>
             
-            {/* 1. Summary Metrics (Old Metrics) */}
+            {/* 1. Summary Metrics */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 text-center">
                 <span className="text-xs text-zinc-500 uppercase font-bold">Score</span>
@@ -412,9 +546,32 @@ export default function PronunciationScorer() {
               </div>
             </div>
 
-            {/* 2. Granular Phonetic Matrix (New Logic) */}
+            {/* 2. Granular Phonetic Matrix with Legend */}
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-              <h4 className="text-sm font-bold text-zinc-400 uppercase mb-4">Phoneme Alignment Matrix</h4>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                <h4 className="text-sm font-bold text-zinc-400 uppercase">Phoneme Alignment Matrix</h4>
+                
+                {/* --- COLOR LEGEND UI --- */}
+                <div className="flex flex-wrap gap-3 text-[10px] sm:text-xs font-semibold bg-zinc-950 px-3 py-2 rounded-lg border border-zinc-800/50">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-sm bg-zinc-800 border border-emerald-900/50"></span>
+                    <span className="text-emerald-400">Correct</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-sm bg-rose-900/30 border border-rose-800"></span>
+                    <span className="text-rose-400">Mispronounced</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-sm bg-amber-900/30 border border-amber-800"></span>
+                    <span className="text-amber-400">Skipped</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-sm bg-blue-900/30 border border-blue-800"></span>
+                    <span className="text-blue-400">Extra</span>
+                  </div>
+                </div>
+              </div>
+
               <div className="flex flex-wrap gap-2">
                 {(result?.alignment_details || []).map((item: any, i: number) => {
                   const styles: any = {
@@ -429,14 +586,18 @@ export default function PronunciationScorer() {
                         {item.type === 'mispronunciation' ? item.actual : (item.phone || item.expected)}
                       </span>
                       {item.type === 'mispronunciation' && (
-                        <span className="text-[9px] text-zinc-500 uppercase italic">exp: {item.expected}</span>
+                        <span className="text-[9px] text-zinc-500 uppercase italic mt-0.5">exp: {item.expected}</span>
                       )}
                     </div>
                   );
                 })}
               </div>
+              <p className="text-xs text-zinc-600 mt-4 italic">
+                * Note: Red blocks show the sound you made, with the expected sound listed beneath it.
+              </p>
             </div>
 
+            {/* 3. Whisper Transcript */}
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
               <h3 className="text-sm font-semibold text-zinc-400 mb-2 uppercase tracking-wide">Transcript</h3>
               <p className="text-zinc-300 italic">"{result?.meta?.whisper_transcription}"</p>
